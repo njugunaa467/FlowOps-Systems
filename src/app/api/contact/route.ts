@@ -22,6 +22,9 @@ const createTransporter = () => {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
   }
 
@@ -31,6 +34,7 @@ const createTransporter = () => {
     return nodemailer.createTransport({
       host: "smtp.sendgrid.net",
       port: 587,
+      secure: false,
       auth: {
         user: "apikey",
         pass: process.env.SENDGRID_API_KEY,
@@ -237,24 +241,46 @@ export async function POST(request: Request) {
     }
 
     // Create transporter
-    const transporter = createTransporter();
+    let transporter;
+    try {
+      transporter = createTransporter();
+    } catch (error) {
+      console.error("Failed to create email transporter:", error);
+      return new Response(
+        JSON.stringify({
+          error: "Email service configuration error. Please contact support.",
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     // Send inquiry email to company
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
-      subject: `New Inquiry: ${data.projectType} - ${data.name}`,
-      html: generateInquiryEmail(data),
-      replyTo: data.email,
-    });
+    try {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
+        subject: `New Inquiry: ${data.projectType} - ${data.name}`,
+        html: generateInquiryEmail(data),
+        replyTo: data.email,
+      });
+    } catch (error) {
+      console.error("Failed to send inquiry email:", error);
+      throw new Error(`Failed to send inquiry email: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
 
     // Send confirmation email to user
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: data.email,
-      subject: "We received your inquiry - FlowOps Systems",
-      html: generateConfirmationEmail(data),
-    });
+    try {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: data.email,
+        subject: "We received your inquiry - FlowOps Systems",
+        html: generateConfirmationEmail(data),
+      });
+    } catch (error) {
+      console.error("Failed to send confirmation email:", error);
+      // Don't fail the entire request if confirmation email fails
+      console.warn("Confirmation email failed but inquiry was sent");
+    }
 
     // Log successful submission (optional)
     console.log(`Contact form submitted by: ${data.name} (${data.email})`);
