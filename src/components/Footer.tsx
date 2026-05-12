@@ -28,7 +28,7 @@ export default function Footer() {
     {
       title: "Connect",
       links: [
-        { label: "Email", href: "mailto:njugunaa467@gmail.com" },
+        { label: "Email", href: "mailto:flowopsystems@gmail.com" },
         { label: "WhatsApp", href: "https://wa.me/254793638107" },
         { label: "Twitter", href: "#" },
         { label: "LinkedIn", href: "#" },
